@@ -1,9 +1,18 @@
 import path from "path";
 import fs from "fs";
 import express, { Request, Response } from "express";
+import dotenv from "dotenv";
 
+dotenv.config({
+  path: ".env.local",
+});
 const app = express();
-const port = 8080;
+
+if (!process.env.PORT) {
+  throw new Error("환경변수를 찾을수 없습니다.");
+}
+
+const port = process.env.PORT;
 
 app.get("/", (req: Request, res: Response) => {
   res.send("hello world");
@@ -12,7 +21,7 @@ app.get("/", (req: Request, res: Response) => {
 app.get("/video", (req: Request, res: Response) => {
   const filePath = path.resolve(
     __dirname,
-    "./videos/SampleVideo_1280x720_1mb.mp4"
+    "../videos/SampleVideo_1280x720_1mb.mp4"
   );
 
   fs.stat(filePath, (err, stats) => {
@@ -29,4 +38,4 @@ app.get("/video", (req: Request, res: Response) => {
   });
 });
 
-app.listen(port, () => console.log(`Example app listening on port${port}!`));
+app.listen(port, () => console.log(`Example app listening on port ${port}!`));

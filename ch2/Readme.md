@@ -57,3 +57,46 @@
 구조는 다음과 같다.
 
 - HTTP GET: /video
+
+여기서 `createReadStream` 함수를 사용하여 만든다.
+말 그대로 `스트리밍 데이터` 로 작업하기 위한 추상적 인터페이스라고 하는데,
+
+보통 대용량 파일 및 데이터 수정 및 변형을 위해 쓰이는 듯 하다.
+
+간단한 예로
+
+```js
+process.stdout.write("택스트"); // "택스트"
+```
+
+위 처럼 `stdout` 역시 `stream` 으로 작동한다.
+[fs.createReadStream 노드 js docs](https://nodejs.org/api/fs.html#fscreatereadstreampath-options)
+
+내용을 살펴보면, `chunk` 는 `The chunk of data` 라고 하는데, `Buffer` 의 모음으로 생각하면 될 것 같다.
+
+`Buffer` 는 `raw binary data` 를 저장한 객체로, 바이트를 저장하고 처리한다.
+
+컴퓨터는 이진수로 처리되며, 실제로 모든 데이터는 이진수이다.
+이진수의 숫자를 처리할 수 있다면, 큰 용량을 가진 `data` 를 세분화하여  
+청크단위로 묶은후 전송하고, 나중에 순서대로 합치면 되는 방식이다.
+
+무언가를 `download` 할때, `percentage` 가 큰 용량의 `data` 를  
+`chunk` 로 묶어서 보내는것으로 생각하면 될것 같다.
+
+이는, `vidoe` 에서도 사용되는 기법이며, 현재 만든 매우 단순한 `application` 에서도 `readStream` 을 사용한후, `pipe` 함수를 통해  
+`res` 객체로 보낸것이다.
+
+## 운영환경
+
+```shell
+
+npm install --only=production
+
+```
+
+위의 명령어는 `npm` 에서 운영환경에서만 필요한 종속성을 설치한다.
+개발환경에만 필요한 패키지 설치를 방지한다.
+
+> `package.json` 의 `devDependencies` 에 있는 패키지는 설치 안된다는것이다.
+
+지금까지는 굉장히 간단한 내용이다.
