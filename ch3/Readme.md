@@ -178,4 +178,4 @@ docker run -dp 3000:3000 -e PORT=3000 --name video-streaming ghcr.io/jaehoon0822
 
 ```
 
-이제
+이제 `repository` 에서 `image` 를 가져와 실행할수 있게 되었다.
