@@ -15,6 +15,9 @@ COPY package*.json  .
 # 명시된 패키지 버전 install
 RUN npm ci
 
+# tsconfig 복사
+COPY tsconfig.json ./tsconfig.json
+
 # src 폴더를 `working dir` 에 복사
 COPY ./src ./src
 
