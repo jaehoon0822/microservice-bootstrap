@@ -1,0 +1,37 @@
+version: "3"
+services:
+  # db 설정
+  db:
+    image: mongo:4.2.8
+    command: mongod --port 27018
+    container_name: db
+    ports:
+      - 4000:27018
+    volumes:
+      - ./db:/data/db
+    restart: always
+
+  # video-streaming 서비스 설정
+  video-streaming:
+    image: video-streaming
+    build:
+      context: ./video-streaming
+      dockerfile: Dockerfile
+    container_name: video-streaming
+    ports:
+      - 4001:80
+    env_file: "video-streaming/config/.env"
+    volumes:
+      - ./video-streaming/src:/usr/app/src
+    restart: no
+  # azure-storage 서비스 설정
+  azure-storage:
+    image: azure-storage
+    build:
+      context: ./azure-storage
+      dockerfile: Dockerfile
+    container_name: video-storage
+    ports:
+      - 4002:80
+    env_file: "azure-storage/config/.env"
+    restart: no
