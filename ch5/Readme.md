@@ -128,7 +128,11 @@ volumes:
 `RabbitMQ` 는 메시지를 보내는 서비스를 `Publisher` 라 부르며,  
 받는 서비스르 `Consumer` 라 부른다.
 
-기본적인 컨셉은 이렇다.
+아무래도 `RabbitMQ` 에 대한 개념설명이 책에서는 부족하다.
+개념적인 설명을 공부하고 정리해야 겠다.
+
+> 역시 코딩은 이해하고 작성해야 하더라...
+> `RabbitMQ` 이해하고 나중에 `Kafka` 보면 더 수월하게 익히겠지..
 
 ---
 
@@ -170,7 +174,7 @@ volumes:
 
 - **`Delivery Mode`**: `persistent(영속적)` 이거나 `transient(일시적)` 로 설정할 수 있다. `RabbitMQ` 를 재시작할때 `Persistent` 는 디스크에 기록되어 리로드되지만, `transient` 는 일시적인 데이터로 사라진다.
 
-- **`Priority`**: `message` 우선순위를 결정하며, 0=255 사이의 값을 가진다.
+- **`Priority`**: `message` 우선순위를 결정하며, `0-255` 사이의 값을 가진다.
 
 - **`Message ID`**: `Producer` 에 의해 설정된 `message` 를 식별할 수 있는 고유 `ID` (선택적 옵션)
 
@@ -215,6 +219,52 @@ volumes:
 - **`Type`**: `Exchange` 의 타입.
 
 > `fanout`, `direct`, `topic`, `headers` 를 사용할수 있다.
+>
+> ---
+>
+> - **`fanout`**: 특정 라우팅 키나 패턴 고려없이, `Exchange` 에 연결된 모든 `Queue` 로 메시지를 전달
+>
+> ---
+>
+> - **`direct`**: `binding` 에 정의된 `routing key` 로 `Queue` 에 보내는 `message` 이다.
+>
+> > `queue` 를 식별하기 위해서는 `message routing key` 와 `queue routing key` 가 있어야 한다. `message routing key` 와 `queue routing key` 를 비교해서 같으면 해당 `queue` 로 `message` 를 보내는 매커니즘이다.
+>
+> ---
+>
+> - **`topick`**: `Routing key` 를 사용하지만, `routing key 와 정확하게 일치`하지 않아도 된다. 대신에, `pattern 일치(wild card)` 로 처리한다.
+>
+> > - **\*(정확히 하나의 `단어` 만 일치)**: `*.message` 는 `test.message` 는 일치한다. 하지만 `more.test.message` 같은 형식은 일치하지 않다.
+> >
+> > - **#(0개 이상의 단어와 일치)**: `#.message` 는 `test.message` 도 일치하고, `more.test.message` 도 일치한다. 단, `test.message.not` 은 일치하지 않는다.
+> >
+> > 즉, `pattern` 에 일치하는 모든 `message queue` 에 `message` 를 전달한다.
+>
+> ---
+>
+> - **`headers`**: `message` 라우팅을 사용하기 위한 `message header` 이다. 메시지의 `routing key` 는 무시하며, `headers` 를 이용하여 복잡한 조건의 `message routing` 이 가능하다. `headers` 는 키-값 쌍이 포함되어 있으며, 여러 속성을 갖는다.
+>
+> > **Headers 에 사용되는 X-Arugument**
+> >
+> > `RabbitMQ`에서 `headers Exchange` 바인딩에 사용되는 특별한 인자(`x-argument`)이다.
+> >
+> > **`x-match`**: 이 인자는 바인딩된 큐로 메시지를 라우팅할때 헤더 속성들 간의 일치여부를 지정한다.
+> >
+> > - **`any`**: (default) 바인딩 조건 중 하나라도 일치하면 메시지를 라우팅
+> >
+> > - **`all`**: 모든 조건이 일치해야 메시지를 라우팅
+> >
+> > **`x-death`**: 이 인자는 `death-letter Queue` 와 관련된 정보를 포함한다. 메시지가 `death-letter Queue` 로 이동했을때 저장된다.
+> >
+> > **`x-message-ttl`**: 이 인자는 `TTL(Time-To-Live)` 를 설정한다. `Queue` 에 `message` 가 대기하는 시간을 설정한다.
+> >
+> > **`x-expires`**: 이 인자는 `TTL(Time-To-Live)` 를 설정한다. `Queue` 에 `message` 가 대기하는 시간을 설정한다.
+> >
+> > **`x-max-length`**: 이 인자는 `Queue` 에 저장될 수 있는 최대 `message` 갯수를 설정한다.
+> >
+> > **`x-length-bytes`**: 이 인자는 `Queue` 에 저장될 수 있는 최대 `byte` 를 설정한다.
+>
+> ---
 
 - **`Durabillity`**: `RabbitMQ` 재시작시, `Exchange` 를 보존할지 삭제할지 결정한다.
 
@@ -228,38 +278,115 @@ volumes:
 
 > 이러한 인수는 대부분 `Plugin` 과 관련있다.
 
+**_Default Exchange_**
+
+`RabbitMQ` 실행시 자동적으로 생성되는 `Exchange` 이다.  
+이 `Exchange` 는 특별하다. 삭제할수 없으며, 이름이 없다.
+
+`Default Exchange` 의 기본 `type` 은 `direct` 이다.  
+이런 이유로 `direct Exchange` 로 간주된다.
+
+내가 이해하기로는 `queue` 에 따로 `Exchange` 를 `binding` 하지 않았더라도, `Default Exchange` 를 사용하여 `queue routing key` 로 `message` 를 보내면 받을수 있다.
+
+즉, `binding` 없이 `routing key` 로 `message` 를 보낼수 있는 가장 기본적인 `Exchange` 라고 생각해도 될것 같다.
+
+**_Exchange Binding_**
+
+`Exchange` 는 `Queue` 하고만 `Binding` 되지 않는다.  
+`Exchange` 끼리도 `Binding` 가능하다.
+
+마지막 `Exchange` 는 `message` 를 결국 `Queue` 로 전달한다. (`Exchange` 는 `Queue` 로 전달하기 위한 `Router` 이니 당연하다.)
+
+`Exchange Binding`이 유용하게 사용될 수 있지만,  
+확실히 서비스상의 복잡한 관계가 형성될 것으로 보인다.
+
 구조는 아래와 비슷할것이다.
+
+**_Alternate Exchange_**
+
+어떠한 `message` 는 `routing` 되지 않았거나, `routing` 할수 없는 `message` 가 존재할 수 한다. 이럴때 폐기될수 있지만, 이러한 `message` 를 `Alternate Exchange` 로 설정 가능하다.
+즉, `폐기될 message` 들은 전부 `Alternate Exchange` 로 향하여
+`Alternate Exchange` 와 `binding` 된 `Queue` 에 저장된다.
+
+> 지정시 새로운 `Exchange` 를 생성한후(`exchange name=alter_exchange`), 대상 `Exchange` 에 `aruments={"alternate-exchange":"alter_exchange"}` 형식으로 지정을 해주어야 한다.
+
+```bash
+# alter_exchange 생성
+rabbitmqadmin declare exchange name=alter_exchange type=fanout
+# alter_exchange 에 binding 할 alter_queue 새성
+rabbitmqadmin declare queue name=alter_queue
+# binding 시킨다.
+rabbitmqadmin declare binding source=alter_exchange destination=alter_queue
+
+# 새로운 exchange1 에 alternate-exchange 를 설정한다.
+rabbitmqadmin declare exchange name=exchange1 type=direct arguments='{"alternate-exchange": "alter_exchange"}'
+
+# 새로운 exchange2 에 alternate-exchange 를 설정한다.
+rabbitmqadmin declare exchange name=exchange2 type=direct arguments='{"alternate-exchange": "alter_exchange"}'
+
+```
+
+> 보면 이러한 방식으로 각각 `exchange` 에 `alternate exchange` 를 설정한다.
+> 그럼 `exchange1`, `exchange2` 에 보내지는 `message` 에 해당하는 `routing key` 가 없다면, `alter_exchange` 로 보내진다.
+> 그럼 `alter_queue` 로 `message` 가 보내질 것이다.
+
+**_Push_**
+
+`Cousumer` 는 `Queue` 를 `Subscription` 하고 대기한다.  
+그럼 이후 `Queue` 에 `message` 가 있다면 자동적으로  
+`Subscription Consumer` 에 `push` 한다.
+
+이때, `Subscription Cousumer` 는 지속적으로 `polling` 방식으로
+`Qeueue` 를 감지하고 있는다.
+
+**_Pull_**
+
+`Consumer` 가 직접 수동으로 `Queue` 에서 `message` 를 가져오는  
+경우이다. 이경우 `필요한 경우도 있지만, 권장되는 방식은 아니다.`
+
+**_Work Queue_**
+
+`RabbitMQ` 개념을 알아보는데 오래걸렸다..
+대략적인 구조를 보자면 아래과 비슷할 것이다.
 
 ```sh
    | publisher |
         |
-      message
+   | message(routing key 를 같이 보냄) |
         |
         v
 ----- broker ------------------------------------
         |
         v
     --------------------------------------------
-                  < Exchanges (여러 `Exchange`) >
+             < Exchanges (여러 `Exchange`) >
               받은 메시지를 고유한 이름을 가진
               Queue 로 라우팅
+              `Exchange` 끼리 서로 `binding` 될수 있다.
     --------------------------------------------
     |  Exchange  |  |  Exchange  |  |  Exchange  |
     --------------------------------------------
         |
         |
-      < 고유한 이름을 가진 Queue 들 >
+     Exchange 가
+     message routing key 를
+     queue routing key 와 비교이후
+     해당하는 `queue` 로 보냄
         |
         v
+      < routing key 를 가진 Queue 들 >
+    ---------------------------------------------
     |  Queue  |  |  Queue  |  |  Queue  |
     -----------  -----------  -----------
     | message |  | message |  | message |
     -----------  -----------  -----------
-    | message |               | message |
+                 | message |  | message |
+    ---------------------------------------------
         |
         v
 -------------------------------------------------
         |
+    | message |
         |
         v
    | Consumer |
