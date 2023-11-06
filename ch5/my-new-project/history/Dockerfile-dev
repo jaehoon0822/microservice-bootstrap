@@ -1,0 +1,13 @@
+FROM node:alpine
+
+WORKDIR /usr/app
+
+COPY ./tsconfig.json .
+
+COPY ./package*.json .
+
+RUN npm config set prefer-offline true  
+
+RUN npm ci
+
+ENTRYPOINT [ "npm", "run", "start:dev" ]
