@@ -189,7 +189,7 @@ volumes:
 
 - **`Durable`**: `RabbitMQ` 재시작시, `Queue` 를 보존할지 삭제할지 결정한다.
 
-- **`Aut Delete`**: `Consumer` 가 구독하지 않은 `Queue` 라면, 자동적으로 삭제한다.
+- **`Auto Delete`**: `Consumer` 가 구독하지 않은 `Queue` 라면, 자동적으로 삭제한다.
 
 - **`Exclusive`**: 오직 하나의 `connection` 에서만 사용가능하다. 그리고 `connection` 이 닫히면 삭제된다.
 
@@ -216,9 +216,17 @@ volumes:
 
 > `fanout`, `direct`, `topic`, `headers` 를 사용할수 있다.
 
-- **`Type`**: `Exchange` 의
+- **`Durabillity`**: `RabbitMQ` 재시작시, `Exchange` 를 보존할지 삭제할지 결정한다.
 
-- **`Type`**: `Exchange` 의
+- **`Auto Delete`**: `Exchange` 와 관련된 모든 큐가 더이상 필요하지 않을때, `Exchange` 를 자동으로 삭제한다.
+
+- **`Internal`**: 내부 `Exchange` 는 다른 `Exchange` 로 부터 `message` 를 전달받을수 있다.
+
+- **`Alternate Exchange`**: `Exchange` 에서 메시지를 라우팅할때 `key` 나 `pattern` 이 일치하지 않는 경우 메시지 손실이 이루어질수 있다. 이때 `Alternate Exchange` 를 설정하면 라우팅 실패한 메시지를 `Alternate Exchange` 로 전송하여 처리가능하다.
+
+- **`Other Arguments(x-arguments)`**: `Exchange` 를 생성할때, 기타 명명된 `arguments` 혹은 `settings` 를 제공할수 있다. `x-` 로 이름이 시작되어, `x-arguments` 라 불린다.
+
+> 이러한 인수는 대부분 `Plugin` 과 관련있다.
 
 구조는 아래와 비슷할것이다.
 
