@@ -57,6 +57,6 @@
     /* Advanced Options */
     "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "./tsconfig.json"],
   "exclude": ["node_modules"]
 }

@@ -344,8 +344,6 @@ rabbitmqadmin declare exchange name=exchange2 type=direct arguments='{"alternate
 `Consumer` 가 직접 수동으로 `Queue` 에서 `message` 를 가져오는  
 경우이다. 이경우 `필요한 경우도 있지만, 권장되는 방식은 아니다.`
 
-**_Work Queue_**
-
 `RabbitMQ` 개념을 알아보는데 오래걸렸다..
 대략적인 구조를 보자면 아래과 비슷할 것이다.
 
@@ -411,3 +409,121 @@ rabbitmqadmin declare exchange name=exchange2 type=direct arguments='{"alternate
 
 이는 `Horizontally scalable` 하게 처리 가능하게 된다.  
 `Consumer` 가 `message` 처리를 못한다면, 다른 확장된 `Consumer`에게 보내면 된다.
+
+## HTTP 를 사용한 직접 메시징
+
+아.. `RabbitMQ` 기초적 개념은 이해가 가는것 같다.  
+그럼 간단한 `HTTP` 직접 메시징을 처리해 본다
+
+`Docker compose` 는 자체적인 `Network` 를 가진다.  
+이때 이 `Network` 는 기본값인 `brige` 이며, 해당 `Network` 에  
+속하는 `service` 들은 `Private Network` 내에서 통신이 가능하다.
+
+`service` 접근을 위서는 `ip` 주소가 필요한데, `Docker compose` 는 `DNS` 를 가지고 있어서, 해당 `service` 명을 식별자로 해서  
+`ip` 주소로 변환해준다.
+
+이는 매우 편리하게 각 서비스간의 소통이 이루어지도록 만들어준다.
+
+> 책에서 구현된 것은 뭔가 `express` 스럽지 못하다는 느낌이  
+> 들었다. 그래서 `express` 에서 `router` 로 구성해서 `history/viewed` 를 구성했고, `http.request` 를 사용하기 보다는  
+> 잘 만들어진 `axios` 로 통신을 구현했다.
+
+잘 작동되며, `db` 에도 저장되는것을 확인했다.
+
+## 드디어 RabbitMQ 를 사용한 간접 메시징을 이용해본다
+
+> `RabbitMQ` 를 보기 위해 하루 종일 작성중이다...
+>
+> 아무래도, 복잡한 `간접 메시징` 처리인데,
+> 개념정도는 알고 넘어가야 나중에 수월할것이다.
+
+---
+
+> 래핏MQ 는 메시지 송신과 수신자 사이에 연결이 없어도 된다.  
+> 송신자는 어느 마이크로서비스가 메시지를 처리할지 모른다.
+>
+> 래빗MQ 는 성숙한 도구이며, 안정적이다. 개발된지는 10년 이상  
+> 지났고, 여러 프로토콜 중에서 메시지 중계(`message broker`)
+
+통신을 위한 공개된 표준인 `AMQP(Advenced Message Queueing Protocol)` 을 따른다
+
+`nodejs` 에서 지원하는 `rabbitMQ`는 [amqplib](https://www.npmjs.com/package/amqplib) 이다.
+
+## Fault-tolerant(내결함성)
+
+기본적으로 `Microservice` 를 구현하면서 `Fault-tolerant` 를  
+강조한다.
+
+여기서 `RabbitMQ` 를 사용하고 있으며, `Dockerfile-dev` 에서  
+`depends-on` 을 사용하여, `history` 서비스가 의존하는 형태로  
+만들었다.
+
+하지만, `Kubernetes` 가 아닌 `docker compose` 를 사용하고  
+있으므로, `RabbitMQ` 가 준비됐는지 혹은 다운되었는지 알수없다.
+
+> 이 책에서는 `RabbitMQ` 자체가 다른 `microservice` 들에 비해  
+> 무겁다고 강조한다. 이러한 경우, `RabbitMQ` 서비스가 만들어져도  
+> 서버가 준비중이라면 `microservice` 는 `message` 를 받지 못한다.
+>
+> 이러한 문제를 해결하기 위한 우회방법으로 `wait-port` 라는  
+> `npm package` 를 사용한다.
+
+[wait-port](https://www.npmjs.com/package/wait-port) 에서  
+다음처럼 글이 적혀있다.
+
+> Simple binary to wait for a port to open. Useful when writing scripts which need to wait for a server to be available.
+
+`port` 가 `open` 될때까지 기다리는 간단한 `binary` 라 한다.
+`server` 가 사용가능해질때까지 기다린다는 것이다.
+
+이 `package` 를 사용하면 `port open` 까지 기다리므로  
+`rabbitMQ` 서비스가 시작될때까지 기다리는것은 보장할것이다.
+
+그런데 `안되더라...`
+
+```dockerfile
+FROM node:alpine
+
+WORKDIR /usr/app
+
+COPY ./tsconfig.json .
+
+COPY ./package*.json .
+
+RUN npm config set prefer-offline true
+
+RUN npm ci
+
+RUN npx wait-port $RABBIT_HOST:5672
+
+ENTRYPOINT [ "npm", "run", "start:dev" ]
+```
+
+이렇게 작성했는데, 처음에 책에 나와있는대로
+
+```dockerfile
+
+RUN npx wait-port rabbit:5672
+
+```
+
+이렇게 하니 전혀 작동안되었다. `rabbit` 서비스 자체를  
+못찾는것 같아서, `$RABBIT_HOST=rabbit` 으로 환경변수 등록이후  
+처리해보려 했다.
+
+그럼 작동은 한다.
+하지만, `waiting` 시간이 `100s` 가 넘어간다.
+혹시나 싶어서, 해당 부분을 주석처리하고 `RabbitMQ` 를 재실행  
+해보니, 시간이 걸리기는 하지만, `100s` 까지는 걸리지 않았다.
+
+뭔가 인지를 못한다.
+책에 나와있는대로 하면 안될것 같아, `helthcheck` 를 사용하여  
+처리한다.
+
+[해당내용](https://stackoverflow.com/questions/53031439/connecting-to-rabbitmq-container-with-docker-compose) 을 확인해볼수 있다.
+
+[rabbitmq-diagnostics](https://www.rabbitmq.com/rabbitmq-diagnostics.8.html) 는 해당 문서에서 `특수증상에 사용되는 cli tool` 이라 한다.
+`monitering`, `health checks` 에 사용된다고 한다.
+
+> - **`-q`, `--quiet`**: `output` 을 조용히 처리한다.
+> - **`ping`**: 가장 기본적인 `healthchack` 라고 한다. 만약 `target node` 가 실행중이고, `rabbitmq-diagnostics` 성공적으로 인증한다면 성공한다.

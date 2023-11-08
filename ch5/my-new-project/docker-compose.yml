@@ -1,5 +1,27 @@
 version: "3"
 services:
+  rabbit:
+    image: rabbitmq:3.12.8-management-alpine
+    container_name: rabbit
+    ports:
+      - 5672:5672
+      - 15672:15672
+    expose:
+      - 5672
+      - 15672
+    healthcheck:
+      test: rabbitmq-diagnostics ping
+      interval: 30s
+      timeout: 30s
+      retries: 5
+    restart: always
+
+  db:
+    image: mongo
+    container_name: db
+    ports:
+      - 4000:27017
+    restart: always
   video-streaming:
     image: video-streaming
     build:
@@ -11,10 +33,11 @@ services:
       - ./video-streaming/src:/usr/app/src
       - ./video-streaming/videos:/usr/app/videos
     ports:
-      - 4000:80
+      - 4001:80
     environment:
       - PORT=80
       - NODE_ENV=development
+      - RABBIT=amqp://guest:guest@rabbit:5672
     restart: "no"
 
   history:
@@ -27,8 +50,14 @@ services:
       - ~/.npm/_cacache:/root/.npm/_cacache
       - ./history/src:/usr/app/src
     ports:
-      - 4001:80
+      - 4002:80
     environment:
       - PORT=80
       - NODE_ENV=development
+      - RABBIT=amqp://guest:guest@rabbit:5672
+      - DBHOST=mongodb://db:27017
+      - DBNAME=history
+    depends_on:
+      - db
+      - rabbit
     restart: "no"
