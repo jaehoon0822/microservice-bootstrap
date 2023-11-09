@@ -497,7 +497,7 @@ RUN npx wait-port $RABBIT_HOST:5672
 ENTRYPOINT [ "npm", "run", "start:dev" ]
 ```
 
-이렇게 작성했는데, 처음에 책에 나와있는대로
+이렇게 작성했는데, 뭔가 구분지어서 처리하고 싶어서 아래처럼했는데,
 
 ```dockerfile
 
