@@ -11,6 +11,7 @@ router.get("/", async (_req: Request, res: Response) => {
     "../../videos/SampleVideo_1280x720_1mb.mp4"
   );
   const messageChannel = await createChannel();
+  await messageChannel.assertExchange("viewed", "fanout");
 
   fs.stat(filePath, async (err, stats) => {
     if (err) {
@@ -33,8 +34,7 @@ router.get("/", async (_req: Request, res: Response) => {
     // `message` 를 보내기 때문이다.
     //
     // https://amqp-node.github.io/amqplib/channel_api.html#channel_publish
-    //
-    messageChannel.publish("", "viewed", Buffer.from(jsonMsg));
+    messageChannel.publish("viewed", "", Buffer.from(jsonMsg));
   });
 });
 

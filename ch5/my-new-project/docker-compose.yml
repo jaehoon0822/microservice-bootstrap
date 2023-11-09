@@ -9,11 +9,11 @@ services:
     expose:
       - 5672
       - 15672
-    healthcheck:
-      test: rabbitmq-diagnostics ping
-      interval: 30s
-      timeout: 30s
-      retries: 5
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:5672"]
+    #   interval: 30s
+    #   timeout: 60s
+    #   retries: 10
     restart: always
 
   db:
@@ -39,6 +39,8 @@ services:
       - NODE_ENV=development
       - RABBIT=amqp://guest:guest@rabbit:5672
     restart: "no"
+    depends_on:
+      - rabbit
 
   history:
     image: history
@@ -55,9 +57,35 @@ services:
       - PORT=80
       - NODE_ENV=development
       - RABBIT=amqp://guest:guest@rabbit:5672
+      - RABBIT_URL=rabbit
       - DBHOST=mongodb://db:27017
       - DBNAME=history
     depends_on:
       - db
       - rabbit
-    restart: "no"
+    restart: "on-failure"
+
+  recommendation:
+    image: recommendation
+    build:
+      context: ./recommendation
+      dockerfile: Dockerfile-dev
+    container_name: recommendation
+    volumes:
+      - ~/.npm/_cacache:/root/.npm/_cacache
+      - ./recommendation/src:/usr/app/src
+    ports:
+      - 4003:80
+    environment:
+      - PORT=80
+      - NODE_ENV=development
+      - RABBIT=amqp://guest:guest@rabbit:5672
+      - RABBIT_URL=rabbit
+      - DBHOST=mongodb://db:27017
+      - DBNAME=recommendation
+    depends_on:
+      - db
+      - rabbit
+    links:
+      - rabbit
+    restart: "on-failure"

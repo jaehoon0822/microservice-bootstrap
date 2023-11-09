@@ -10,7 +10,5 @@ RUN npm config set prefer-offline true
 
 RUN npm ci
 
-# RUN npx wait-port $RABBIT_URL:5672
-
 ENTRYPOINT npx wait-port rabbit:5672 && \
            npm run start:dev

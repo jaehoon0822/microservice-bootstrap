@@ -527,3 +527,280 @@ RUN npx wait-port rabbit:5672
 
 > - **`-q`, `--quiet`**: `output` 을 조용히 처리한다.
 > - **`ping`**: 가장 기본적인 `healthchack` 라고 한다. 만약 `target node` 가 실행중이고, `rabbitmq-diagnostics` 성공적으로 인증한다면 성공한다.
+>
+> 그런데 안되었다.
+>
+> 어허, 이거 뭐가 문제인가?
+>
+> 구글링으로도 나오지 않아서 `bard` 를 통해 확인했다.
+> 사실 `AI` 가 유용하기는 해도, 거짓말을 많이해서 신용하는건
+> 어렵지만, 적어도 제대로 작동하는 것이 확인되었다.
+> 그리고 증상이, 처음 `docker compose up` 한 다음에 작동을
+> 안하고, `code` 수정하면, `restart` 되면서 제대로 동작하는것
+> 으로 보아, 내용이 맞는것 같아 적어둔다.
+>
+> 일단, `rabbitMQ` 에서 `서버가 실행된것은` 알수 있지만,
+> `실행후 연결 수립할 준비가 되어있지 않는 상태` 라고 한다.
+>
+> `rabbitmq-diagnostics` 는 `서버 실행` 만 확인할뿐,
+> `연결 수립 준비 확인` 까지는 알지 못한다고 한다.
+>
+> 이에 대한 해결책은 `amqp-dump` 를 사용하여 연결 수락되는지  
+> 확인하는 방식을 사용해야 한다
+>
+>> 책에서 왜 `wait-port` 를 사용햇는지 이해가 간다
+>> 그런데, `wait-port` 도 제대로 작동을 안하니 이렇게라도 사용하는 수밖에..ㅠㅠ
+>
+> `amqp-dump` 는 다음의 옵션이 있다.
+>
+> - -b: RabbitMQ 서버의 주소를 지정
+> - -u: RabbitMQ 서버에 연결할 사용자 이름을 지정
+> - -p: RabbitMQ 서버에 연결할 사용자 암호를 지정
+> - -c: RabbitMQ 서버에 연결할 vhost를 지정
+> - -q: RabbitMQ 서버에서 표시할 큐를 지정
+> - -e: RabbitMQ 서버에서 표시할 exchange를 지정
+> - -k: RabbitMQ 서버에서 표시할 키를 지정
+>
+> `amqp-dump` 에 대해서 알고 싶어서 `docs` 를 찾으려고 했지만,
+> 찾을수가 없었다.
+> 이 부분은 `rabbitmq` 에서 공식 지원되는 서비스가 아니라고  
+> 한다. 해당 `github` 도 찾으려고 했지만 없는 `page` 라 나온다..
+>
+> 일단 이 방법으로 잘 작동하므로, 사용하도록 한다.
+
+### amqp-dump 도 작동안한다
+
+지금 `curl -f localhost:15673` 로 `test` 해봐도 작동안하고,  
+`amqp-dump` 로 다시 작동해 보았는데 되지 않는다.
+
+그리고 `port-wait` 시 `rabbit` 서비스를 `ip` 로 변환하지 못하고  
+있다. 이유를 찾아야 한다.
+
+다시 `port-wait` 으로 되돌아 왔다.
+지금 문제를 알아낸것이, `ENTRYPOINT` 에 `port-wait` 을  
+사용안하고, `RUN` 에 사용한 것이다.
+
+`RUN` 에 사용한 `port-wait rabbit:5672` 에 `rabbit` 은  
+`docker-compoes.yml` 에서 `dockerfile` 을 빌드하고있다.
+이는 아직 `rabbit` 환경변수가 생성되지 않은 시점이다.
+
+`docker-compose` 가 해당 서비스 이름을 `dns` 를 사용하여  
+`ip` 주소로 변환해주는데, 이게 `build` 시점에서는 작동하지  
+않은듯 하다.
+
+이말은 `dockerfile` 빌드 이후에, 적용해야 한다는 것이다.
+그래서 처음에는 다음처럼 적어보았다
+
+```dockerfile
+
+ENTRYPOINT["npx", "port-wait", "rabbit:5672", "&&", "npm", "run", "start:dev"]
+
+```
+
+이것역시 작동안한다, `ENTRYPOINT` 에서 해당 명령어를 읽은다음  
+`rabbit` 환경변수를 보고 치환하는듯 하다.
+
+하지만, 위의 명령은 `npx port-wait rabbit:5672` 명령어, `&&` 명령어, `npm run start:dev`명령어로 나누어진다.
+
+명령어 자체를 `구분` 하여 처리된다.
+이렇게 되면 문제가 전체 명령어를 읽고, 실행하는데 명령어를  
+읽을때 변수로 치환하지 않는다.
+
+`ENTRYPOINT` 명령어 전체를 다 읽고 치환한다.
+각 구분된 명령어를 따로 실행하게 되므로, `rabbit` 변수 치환을  
+못하는 상황이 생긴다.
+
+이를 해결하기 위해서는
+
+```dockerfile
+
+ENTRYPOINT npx port-wait rabbit:5672 && \
+           npm run start:dev
+
+```
+
+이렇게 한줄의 명령어로 적어주어야 제대로 작동한다.
+> 괜히 이것저것 코드 건드리면서 만들어보려다가 힘들게 파고들었다.  
+> 그래도 알지 못했던 사실을 알게되서 다행이다.
+
+한줄로 작성된 코드는 구분되 명령어로 실행되지 않고,  
+하나의 명령줄로 실행된다.
+
+> 마음같아서는 `healthcheck` 로 처리하고 싶은데,  
+> 처리가 되지 않느다. 뭐가 문제인지 문제점을 찾지 못하고 있다.
+> 이건 따로 더 공부해야 할거 같다...
+
+## 단일 수신자를 위한 간접 메시징
+
+> `single-recipient` 메시지 설정으로 일대일 통신으로 사용하는것이다. 이 설정은 여러 전송자와 수신자가 포함될수는  
+있지만, 오직 하나의 마이크로서비스만이 개별 메시지를 수신한다.
+
+좀더 보도록 하자, 내가볼대 `direct message` 를 말하는거 같은데,  
+다른 개념일수도 있겠다.
+
+> 메시지를 `Queue` 에서 가져올때, `Queue` 를 생성하는 것이  
+아니라 확보(`assert`)하는것이다.  
+>
+> 여러개의 마이크로서비스가 하나의 큐를 대상으로 할수 있고,  
+> 큐가 존재하는지 확인하는 것이며, 존재하지 않는 경우 큐를  
+> 생성한다.
+
+아.. 그래서 `assert` 라는 뜻으로 쓰이는구나..
+왜 `create` 라는 말을 쓰지 않았는지 조금 의아했는데,  
+`assert` 라는 의미가 더 명확하다는 것이 느껴진다.
+
+`qmqplib` 는 `Node` 전용 라이브러리이다.  
+책에 나온 코드는 뭔가, `express` 스럽지 않다.
+그래서 그냥 코드 이해하고 내 방식대로 처리해본다.
+
+```ts
+//history/src/utils/createChannel.ts
+import amqplib from "amqplib";
+
+if (!process.env.RABBIT) {
+  throw new Error("RABBIT variable not found");
+}
+
+const RABBIT = process.env.RABBIT;
+
+const createChannel = async () => {
+  return (await amqplib.connect(RABBIT)).createChannel();
+};
+
+export default createChannel;
+
+```
+
+이렇게 작성한다.
+이는 `RabbitMQ` 의 `channel` 을 생성하는 함수이다.
+`amqplib.connect` 를 통해 서버에 접속한후, `channel` 을 생성한다.
+
+`channel` 은 `queue` 와 송수신할수 있는 통로로 생각하면 된다.
+
+이렇게 만들어진 `channel` 을 통해 `assertQueue` 함수로  
+`queue` 생성이 가능하다.
+
+```ts
+import createChannel from "@/utils/createChennel";
+
+const messageChannel = await createChennel()
+await chennel.assertQueue("viwed", {/* Options*/})
+
+```
+
+생성된 `Queue` 에 `message` 를 저장하기 위해서는
+`messageChannel` 의 `consume` 을 사용하고 첫번째 인자에  
+`queue name` 을 넣고, 두번째 `callback` 에서 받은 `mssage` 를  
+사용하여 처리한다을
+
+응? 그런데 `Buffer` 를 `octet stream` 으로 받은 것으로 이해하는데, `toString` 시에 왜 객체가 나오는거지?
+
+>
+> `Buffer` 는 `octet stream` 이며, `toString` 은 `UTF-8` 인코딩으로 변환한다. 객체는 `JSON` 으로 표현가능하며, `JSON` 은  
+`UTF-8`인코딩으로 표현될수있다. (호환된다는 말이다.)
+>
+> `toString` 메서드는 `Buffer` 내용이 `Object` 이면,  
+> 이를 `JSON` 으로 변환하는 기본 동작을 가지고 있다.
+>
+> 그러므로, 위에 내용이 객체더라도, `toString` 메서드를 통해  
+> `JSON 객체` 형식으로 변환가능한것이다.
+
+이렇게 받은 `message.content` 상의 내용을 사용하여 `db` 에  
+저장하면, `message` 기반 서비스로서 처리 가능해진다.
+
+마지막으로, `message` 처리 완료이후에, `messageChannel.ack(msg)` 을 실행한다.  
+
+이는 `messageChannel.ack` 은 `acknowledgement` 로 승인(처리)되었다는 것이다. 처리되었으므로 `queue` 상에 해당 `message` 삭제한다.
+
+이후로, `video-streaming` 이 `publisher` 역할을 하면  
+`message` 전송이 가능하다.
+
+다음과 같다.
+
+```ts
+
+// #publish(exchange, routingKey, content, [options])
+channel.publish("", "viewed", Buffer.from(content));
+
+```
+
+첫번째 인자는, `exchange` 인데 빈값이면, `default exchange` 를  
+사용한다.
+두번째 인자는 `routing key` 이다. 해당 `key` 에 맞는 `queue` 에  
+`message` 를 전달한다.
+세번째 인자는 `content` 인데, `Buffer` 로 변환해서 전송한다.
+네번째는 `options` 이다.
+
+[`channel.publish`](https://amqp-node.github.io/amqplib/channel_api.html#channel_publish) 에서 참고한다.
+
+잘 작동되는 것을 확인했다.
+
+## 다중 수신 메시지
+
+> 다중 수신(`multiple-recipient`) 나 브로드캐스트(`broadcast`)  
+같은 형태가 더 작합한 상황도 있다. 간단히 말하면 하나의  
+마이크로서비스가 메시지를 보내면 다수의 마이크로 서비스가  
+수신하는 것이다.
+>
+> 이런 유형의 메시지는 알림(`notifications`) 이 필요한 경우에  
+사용하면 좋다.
+
+여기서는 `anonymous queue` 를 사용한다.
+말 그대로 `익명의 queue` 로 사용되며, `rabbitMQ` 에 의해 랜덤한  
+이름을 갖게 된다.
+
+생각해보면, `notifications` 은 모든 `queue` 들 에게 `message` 를
+보내는 방식이므로, 굳이 이름지어진 `queue` 일 필요는 없다.
+
+또한, `exclusive` 라는 옵션을 사용하는데, 해당 옵션은  
+서비스 연결 종료시, `queue` 도 같이 사라지는 방식이다.
+
+`notifications` 는 `queue` 자체가 항상 존재할 필요가 없다.
+연결되면 `queue` 를 생성하고 `message` 를 담은다음에,  
+해당 `message` 를 소비하면 된다.
+
+굳이 `queue` 를 지속 유지할 필요는 없다.
+`exclusive` 와 `autoDelete` 는 비슷한 점이 있지만,
+명확히 말하면 조금 다르다.
+
+| 옵션 | 설명 |
+| :--- | :--- |
+| exclusive | `queue` 가 한번에 하나의 `consumer` 만 사용할수 있다. </br> 또한, `queue` 는 `consumer` 가 연결을 해제할때 삭제된다. |
+| autoDelete | `queue` 에 연결된 `consumer` 가 없으면 `queue` 가 삭제된다. |
+
+`notifications` 는 `exclusive` 가 맞다는 생각이 든다.
+
+```ts
+
+// exchange 를 생성한다.
+// assertExchange(name, type, option)
+// 방식으로 각 인자값을 받는다.
+//
+// fanout 타입은 연결된 모든 `queue` 에 `message` 를 
+// 전달한다.
+await messageChannel.assertExchange('viewed', 'fanout')
+
+// queue 는 익명이므로, `distructure` 를 사용하여, `queue` 이름을 받는다.
+const { queue } = await messageChannel.assertQueue("", { exclusive: true });
+
+// exchange 와 queue 를 binding 한다.
+// bindQueue(exchange name, queue name, pattern)
+await messageChannel.bindQueue("viewed", queue, "");
+
+```
+
+아... 이제 처리 완료되었다.
+`다중 메시지` 를 처리하기 위해 정말 많이 독스를 찾아본거 같다.
+하나 할때마다 막히는 상황이니...
+
+> 역시 삽질이 최고다.
+
+## 간접 메시징 제어
+
+> 간접 메시징은 중앙제어가 없기 때문에 오히려 더 유연하고  
+확장성이 있으며 메시징구조를 개선하기 좋다.  
+마이크로서비스가 개별적으로 받은 메시지에 대해서 어떻게 응답할지  책임을 지고, 또 다른 메시지도 응답으로 생성할 수 있다.
+>
+> 마이크로서비스가 죽으면 메시지의 메시지 처리 확인응답인  
+> `ack` 을 받을 수 없고, 결과적으로 다른 마이크로서비스가  
+> 처리하기 위해 메시지를 가져갈 것이다.
