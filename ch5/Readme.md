@@ -300,8 +300,6 @@ volumes:
 `Exchange Binding`이 유용하게 사용될 수 있지만,  
 확실히 서비스상의 복잡한 관계가 형성될 것으로 보인다.
 
-구조는 아래와 비슷할것이다.
-
 **_Alternate Exchange_**
 
 어떠한 `message` 는 `routing` 되지 않았거나, `routing` 할수 없는 `message` 가 존재할 수 한다. 이럴때 폐기될수 있지만, 이러한 `message` 를 `Alternate Exchange` 로 설정 가능하다.
@@ -548,8 +546,8 @@ RUN npx wait-port rabbit:5672
 > 이에 대한 해결책은 `amqp-dump` 를 사용하여 연결 수락되는지  
 > 확인하는 방식을 사용해야 한다
 >
->> 책에서 왜 `wait-port` 를 사용햇는지 이해가 간다
->> 그런데, `wait-port` 도 제대로 작동을 안하니 이렇게라도 사용하는 수밖에..ㅠㅠ
+> > 책에서 왜 `wait-port` 를 사용햇는지 이해가 간다
+> > 그런데, `wait-port` 도 제대로 작동을 안하니 이렇게라도 사용하는 수밖에..ㅠㅠ
 >
 > `amqp-dump` 는 다음의 옵션이 있다.
 >
@@ -620,6 +618,7 @@ ENTRYPOINT npx port-wait rabbit:5672 && \
 ```
 
 이렇게 한줄의 명령어로 적어주어야 제대로 작동한다.
+
 > 괜히 이것저것 코드 건드리면서 만들어보려다가 힘들게 파고들었다.  
 > 그래도 알지 못했던 사실을 알게되서 다행이다.
 
@@ -633,13 +632,13 @@ ENTRYPOINT npx port-wait rabbit:5672 && \
 ## 단일 수신자를 위한 간접 메시징
 
 > `single-recipient` 메시지 설정으로 일대일 통신으로 사용하는것이다. 이 설정은 여러 전송자와 수신자가 포함될수는  
-있지만, 오직 하나의 마이크로서비스만이 개별 메시지를 수신한다.
+> 있지만, 오직 하나의 마이크로서비스만이 개별 메시지를 수신한다.
 
 좀더 보도록 하자, 내가볼대 `direct message` 를 말하는거 같은데,  
 다른 개념일수도 있겠다.
 
 > 메시지를 `Queue` 에서 가져올때, `Queue` 를 생성하는 것이  
-아니라 확보(`assert`)하는것이다.  
+> 아니라 확보(`assert`)하는것이다.
 >
 > 여러개의 마이크로서비스가 하나의 큐를 대상으로 할수 있고,  
 > 큐가 존재하는지 확인하는 것이며, 존재하지 않는 경우 큐를  
@@ -668,7 +667,6 @@ const createChannel = async () => {
 };
 
 export default createChannel;
-
 ```
 
 이렇게 작성한다.
@@ -683,9 +681,10 @@ export default createChannel;
 ```ts
 import createChannel from "@/utils/createChennel";
 
-const messageChannel = await createChennel()
-await chennel.assertQueue("viwed", {/* Options*/})
-
+const messageChannel = await createChennel();
+await chennel.assertQueue("viwed", {
+  /* Options*/
+});
 ```
 
 생성된 `Queue` 에 `message` 를 저장하기 위해서는
@@ -695,9 +694,8 @@ await chennel.assertQueue("viwed", {/* Options*/})
 
 응? 그런데 `Buffer` 를 `octet stream` 으로 받은 것으로 이해하는데, `toString` 시에 왜 객체가 나오는거지?
 
->
 > `Buffer` 는 `octet stream` 이며, `toString` 은 `UTF-8` 인코딩으로 변환한다. 객체는 `JSON` 으로 표현가능하며, `JSON` 은  
-`UTF-8`인코딩으로 표현될수있다. (호환된다는 말이다.)
+> `UTF-8`인코딩으로 표현될수있다. (호환된다는 말이다.)
 >
 > `toString` 메서드는 `Buffer` 내용이 `Object` 이면,  
 > 이를 `JSON` 으로 변환하는 기본 동작을 가지고 있다.
@@ -708,7 +706,7 @@ await chennel.assertQueue("viwed", {/* Options*/})
 이렇게 받은 `message.content` 상의 내용을 사용하여 `db` 에  
 저장하면, `message` 기반 서비스로서 처리 가능해진다.
 
-마지막으로, `message` 처리 완료이후에, `messageChannel.ack(msg)` 을 실행한다.  
+마지막으로, `message` 처리 완료이후에, `messageChannel.ack(msg)` 을 실행한다.
 
 이는 `messageChannel.ack` 은 `acknowledgement` 로 승인(처리)되었다는 것이다. 처리되었으므로 `queue` 상에 해당 `message` 삭제한다.
 
@@ -718,10 +716,8 @@ await chennel.assertQueue("viwed", {/* Options*/})
 다음과 같다.
 
 ```ts
-
 // #publish(exchange, routingKey, content, [options])
 channel.publish("", "viewed", Buffer.from(content));
-
 ```
 
 첫번째 인자는, `exchange` 인데 빈값이면, `default exchange` 를  
@@ -738,12 +734,12 @@ channel.publish("", "viewed", Buffer.from(content));
 ## 다중 수신 메시지
 
 > 다중 수신(`multiple-recipient`) 나 브로드캐스트(`broadcast`)  
-같은 형태가 더 작합한 상황도 있다. 간단히 말하면 하나의  
-마이크로서비스가 메시지를 보내면 다수의 마이크로 서비스가  
-수신하는 것이다.
+> 같은 형태가 더 작합한 상황도 있다. 간단히 말하면 하나의  
+> 마이크로서비스가 메시지를 보내면 다수의 마이크로 서비스가  
+> 수신하는 것이다.
 >
 > 이런 유형의 메시지는 알림(`notifications`) 이 필요한 경우에  
-사용하면 좋다.
+> 사용하면 좋다.
 
 여기서는 `anonymous queue` 를 사용한다.
 말 그대로 `익명의 queue` 로 사용되며, `rabbitMQ` 에 의해 랜덤한  
@@ -763,22 +759,21 @@ channel.publish("", "viewed", Buffer.from(content));
 `exclusive` 와 `autoDelete` 는 비슷한 점이 있지만,
 명확히 말하면 조금 다르다.
 
-| 옵션 | 설명 |
-| :--- | :--- |
-| exclusive | `queue` 가 한번에 하나의 `consumer` 만 사용할수 있다. </br> 또한, `queue` 는 `consumer` 가 연결을 해제할때 삭제된다. |
-| autoDelete | `queue` 에 연결된 `consumer` 가 없으면 `queue` 가 삭제된다. |
+| 옵션       | 설명                                                                                                                 |
+| :--------- | :------------------------------------------------------------------------------------------------------------------- |
+| exclusive  | `queue` 가 한번에 하나의 `consumer` 만 사용할수 있다. </br> 또한, `queue` 는 `consumer` 가 연결을 해제할때 삭제된다. |
+| autoDelete | `queue` 에 연결된 `consumer` 가 없으면 `queue` 가 삭제된다.                                                          |
 
 `notifications` 는 `exclusive` 가 맞다는 생각이 든다.
 
 ```ts
-
 // exchange 를 생성한다.
 // assertExchange(name, type, option)
 // 방식으로 각 인자값을 받는다.
 //
-// fanout 타입은 연결된 모든 `queue` 에 `message` 를 
+// fanout 타입은 연결된 모든 `queue` 에 `message` 를
 // 전달한다.
-await messageChannel.assertExchange('viewed', 'fanout')
+await messageChannel.assertExchange("viewed", "fanout");
 
 // queue 는 익명이므로, `distructure` 를 사용하여, `queue` 이름을 받는다.
 const { queue } = await messageChannel.assertQueue("", { exclusive: true });
@@ -786,7 +781,6 @@ const { queue } = await messageChannel.assertQueue("", { exclusive: true });
 // exchange 와 queue 를 binding 한다.
 // bindQueue(exchange name, queue name, pattern)
 await messageChannel.bindQueue("viewed", queue, "");
-
 ```
 
 아... 이제 처리 완료되었다.
@@ -798,8 +792,8 @@ await messageChannel.bindQueue("viewed", queue, "");
 ## 간접 메시징 제어
 
 > 간접 메시징은 중앙제어가 없기 때문에 오히려 더 유연하고  
-확장성이 있으며 메시징구조를 개선하기 좋다.  
-마이크로서비스가 개별적으로 받은 메시지에 대해서 어떻게 응답할지  책임을 지고, 또 다른 메시지도 응답으로 생성할 수 있다.
+> 확장성이 있으며 메시징구조를 개선하기 좋다.  
+> 마이크로서비스가 개별적으로 받은 메시지에 대해서 어떻게 응답할지 책임을 지고, 또 다른 메시지도 응답으로 생성할 수 있다.
 >
 > 마이크로서비스가 죽으면 메시지의 메시지 처리 확인응답인  
 > `ack` 을 받을 수 없고, 결과적으로 다른 마이크로서비스가  
